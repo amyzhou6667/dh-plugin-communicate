@@ -821,14 +821,14 @@ class TestAPIGateway:
         from src.services.api_gateway import APIGateway
         from src.models.task import TaskStatus
 
-        # 设置不同的创建时间和状态
-        sample_tasks[0].created_at = datetime.now(timezone.utc) - timedelta(days=30)
+        # 设置不同的创建时间和状态（使用 naive datetime 以兼容 SQLite）
+        sample_tasks[0].created_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
         sample_tasks[0].status = TaskStatus.COMPLETED
 
-        sample_tasks[1].created_at = datetime.now(timezone.utc) - timedelta(days=15)
+        sample_tasks[1].created_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=15)
         sample_tasks[1].status = TaskStatus.PENDING  # 待处理任务
 
-        sample_tasks[2].created_at = datetime.now(timezone.utc) - timedelta(days=5)
+        sample_tasks[2].created_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=5)
         sample_tasks[2].status = TaskStatus.COMPLETED
 
         for task in sample_tasks:
