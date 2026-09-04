@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  bridge:
+    build: .
+    container_name: deepseek-harness-bridge
+    ports:
+      - "${BRIDGE_PORT:-8080}:8080"
+    environment:
+      - HARNESS_BASE_URL=${HARNESS_BASE_URL:-http://host.docker.internal:3080}
+      - HARNESS_API_KEY=${HARNESS_API_KEY:-}
+      - FEISHU_APP_ID=${FEISHU_APP_ID}
+      - FEISHU_APP_SECRET=${FEISHU_APP_SECRET}
+      - FEISHU_ENCRYPT_KEY=${FEISHU_ENCRYPT_KEY:-}
+      - FEISHU_VERIFICATION_TOKEN=${FEISHU_VERIFICATION_TOKEN:-}
+      - POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS:-5}
+      - DEFAULT_TIMEOUT_SECONDS=${DEFAULT_TIMEOUT_SECONDS:-300}
+      - MAX_RETRY_COUNT=${MAX_RETRY_COUNT:-3}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///data/bridge.db}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - bridge-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  bridge-data:
