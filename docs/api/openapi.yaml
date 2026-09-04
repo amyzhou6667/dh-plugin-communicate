@@ -1,0 +1,416 @@
+openapi: 3.0.0
+info:
+  title: DeepSeek Harness 飞书桥接插件 API
+  description: |
+    DeepSeek Harness 与飞书之间的消息桥接插件 API 接口定义。
+    主要功能包括：
+    - 从 DeepSeek Harness 获取待确认任务
+    - 将确认消息发送到飞书
+    - 接收飞书用户回复
+    - 将用户回复提交给 DeepSeek Harness
+  version: 1.0.0
+  contact:
+    name: 开发团队
+    email: dev@example.com
+
+servers:
+  - url: http://127.0.0.1:5000
+    description: 本地开发服务器
+  - url: http://bridge.example.com
+    description: 生产服务器
+
+tags:
+  - name: tasks
+    description: 任务管理相关接口
+  - name: webhook
+    description: 飞书回调相关接口
+  - name: health
+    description: 健康检查接口
+
+paths:
+  /api/tasks/pending:
+    get:
+      tags:
+        - tasks
+      summary: 获取待确认任务
+      description: |
+        从 DeepSeek Harness 获取待确认任务列表。
+        该接口会查询 DeepSeek Harness 的待确认任务，并返回过滤后的任务列表。
+      operationId: getPendingTasks
+      responses:
+        '200':
+          description: 成功获取待确认任务
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      tasks:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Task'
+                  message:
+                    type: string
+                    example: "获取待确认任务成功"
+              example:
+                success: true
+                data:
+                  tasks:
+                    - id: "task_123"
+                      harness_task_id: "harness_456"
+                      content: "请确认以下操作：删除用户数据"
+                      context:
+                        user_id: "user_789"
+                        action: "delete_user_data"
+                      status: "pending"
+                      created_at: "2026-09-03T10:00:00Z"
+                      timeout_at: "2026-09-03T10:05:00Z"
+                message: "获取待确认任务成功"
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "INTERNAL_ERROR"
+                  message: "获取待确认任务失败"
+                message: "服务器内部错误"
+
+  /api/tasks/{task_id}/reply:
+    post:
+      tags:
+        - tasks
+      summary: 提交用户回复
+      description: |
+        将用户通过飞书的回复提交给 DeepSeek Harness。
+        该接口会将用户回复转发给对应的 DeepSeek Harness 任务。
+      operationId: submitUserReply
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          description: 任务ID
+          schema:
+            type: string
+            example: "task_123"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reply_text
+                - user_id
+              properties:
+                reply_text:
+                  type: string
+                  description: 用户回复内容
+                  example: "确认执行"
+                user_id:
+                  type: string
+                  description: 用户ID
+                  example: "user_456"
+      responses:
+        '200':
+          description: 成功提交用户回复
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      task_id:
+                        type: string
+                        example: "task_123"
+                      status:
+                        type: string
+                        example: "completed"
+                  message:
+                    type: string
+                    example: "用户回复提交成功"
+              example:
+                success: true
+                data:
+                  task_id: "task_123"
+                  status: "completed"
+                message: "用户回复提交成功"
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "INVALID_REQUEST"
+                  message: "请求参数错误"
+                message: "请求参数错误"
+        '404':
+          description: 任务不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "TASK_NOT_FOUND"
+                  message: "任务不存在"
+                message: "任务不存在"
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "INTERNAL_ERROR"
+                  message: "提交用户回复失败"
+                message: "服务器内部错误"
+
+  /webhook/feishu:
+    post:
+      tags:
+        - webhook
+      summary: 飞书消息回调
+      description: |
+        接收飞书平台的消息回调。
+        当用户通过飞书回复消息时，飞书平台会调用此接口。
+      operationId: handleFeishuCallback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - event
+              properties:
+                event:
+                  type: object
+                  required:
+                    - message
+                  properties:
+                    message:
+                      type: object
+                      required:
+                        - content
+                        - message_type
+                        - open_id
+                      properties:
+                        content:
+                          type: string
+                          description: 消息内容
+                          example: "确认执行"
+                        message_type:
+                          type: string
+                          description: 消息类型
+                          enum:
+                            - text
+                            - image
+                            - file
+                          example: "text"
+                        open_id:
+                          type: string
+                          description: 用户OpenID
+                          example: "ou_xxx"
+      responses:
+        '200':
+          description: 成功处理飞书回调
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "回调处理成功"
+              example:
+                success: true
+                message: "回调处理成功"
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "INVALID_REQUEST"
+                  message: "请求参数错误"
+                message: "请求参数错误"
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "INTERNAL_ERROR"
+                  message: "处理飞书回调失败"
+                message: "服务器内部错误"
+
+  /health:
+    get:
+      tags:
+        - health
+      summary: 健康检查
+      description: 检查服务是否正常运行
+      operationId: healthCheck
+      responses:
+        '200':
+          description: 服务正常运行
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2026-09-03T10:00:00Z"
+                  version:
+                    type: string
+                    example: "1.0.0"
+              example:
+                status: "healthy"
+                timestamp: "2026-09-03T10:00:00Z"
+                version: "1.0.0"
+
+components:
+  schemas:
+    Task:
+      type: object
+      required:
+        - id
+        - harness_task_id
+        - content
+        - status
+        - created_at
+        - timeout_at
+      properties:
+        id:
+          type: string
+          description: 任务ID
+          example: "task_123"
+        harness_task_id:
+          type: string
+          description: DeepSeek Harness 任务ID
+          example: "harness_456"
+        content:
+          type: string
+          description: 任务内容
+          example: "请确认以下操作：删除用户数据"
+        context:
+          type: object
+          description: 上下文信息
+          example:
+            user_id: "user_789"
+            action: "delete_user_data"
+        status:
+          type: string
+          description: 任务状态
+          enum:
+            - pending
+            - sent
+            - replied
+            - completed
+            - timeout
+            - failed
+          example: "pending"
+        feishu_message_id:
+          type: string
+          description: 飞书消息ID
+          example: "msg_789"
+        user_reply:
+          type: string
+          description: 用户回复
+          example: "确认执行"
+        user_id:
+          type: string
+          description: 用户ID
+          example: "user_456"
+        created_at:
+          type: string
+          format: date-time
+          description: 创建时间
+          example: "2026-09-03T10:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: 更新时间
+          example: "2026-09-03T10:00:00Z"
+        timeout_at:
+          type: string
+          format: date-time
+          description: 超时时间
+          example: "2026-09-03T10:05:00Z"
+        retry_count:
+          type: integer
+          description: 重试次数
+          example: 0
+
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+        - message
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              description: 错误代码
+              example: "INTERNAL_ERROR"
+            message:
+              type: string
+              description: 错误信息
+              example: "服务器内部错误"
+        message:
+          type: string
+          description: 用户友好错误信息
+          example: "服务器内部错误"
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - BearerAuth: []
