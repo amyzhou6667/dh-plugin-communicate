@@ -146,3 +146,12 @@ class TaskRepository:
         return self.session.query(Task).filter(
             Task.retry_count < max_retry_count
         ).all()
+
+    def get_existing_harness_task_ids(self) -> set:
+        """获取所有已存在的 harness_task_id
+
+        Returns:
+            set: harness_task_id 集合
+        """
+        results = self.session.query(Task.harness_task_id).all()
+        return {row[0] for row in results}
